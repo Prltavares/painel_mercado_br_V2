@@ -201,12 +201,26 @@ def apply_theme(theme: str, high_contrast: bool, large_text: bool) -> None:
       width:100%; justify-content:flex-start; text-align:left; padding:.64rem .85rem;
       min-height:2.75rem; margin-bottom:.1rem; border-radius:10px;
     }}
+    section[data-testid="stSidebar"] [data-testid="stButton"] button {{
+      background:var(--surface) !important; color:var(--text) !important;
+      border-color:var(--border) !important;
+    }}
+    section[data-testid="stSidebar"] [data-testid="stButton"] button p,
+    section[data-testid="stSidebar"] [data-testid="stButton"] button span,
+    section[data-testid="stSidebar"] [data-testid="stButton"] button div {{
+      color:var(--text) !important;
+    }}
     section[data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"] {{
       background:var(--accent-soft) !important; color:var(--accent) !important;
       border-color:var(--border) !important; box-shadow:inset 3px 0 0 var(--accent);
     }}
-    section[data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"] p {{
+    section[data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"] p,
+    section[data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"] span,
+    section[data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"] div {{
       color:var(--accent) !important; font-weight:750;
+    }}
+    section[data-testid="stSidebar"] [data-testid="stButton"] button:focus-visible {{
+      outline:3px solid var(--accent) !important; outline-offset:2px !important;
     }}
 
     @media (max-width: 800px) {{
@@ -910,10 +924,15 @@ elif selected_page == "Gráficos":
                     x=hist.index, y=hist["Volume"], name="Volume", opacity=.22,
                     marker_color="#8da3b8",
                 ), row=1, col=1, secondary_y=True)
-            else:
-                fig.add_trace(trace)
+                # Esses eixos secundários só existem no layout de subplots criado
+                # quando o volume está habilitado.
                 fig.update_yaxes(title_text="Preço", secondary_y=False)
                 fig.update_yaxes(title_text="Volume", secondary_y=True, showgrid=False)
+            else:
+                # Uma Figure simples não tem referência de subplot/secondary_y.
+                # Definir o título pelo layout funciona em qualquer gráfico.
+                fig.add_trace(trace)
+                fig.update_layout(yaxis_title="Preço / pontos")
             fig.update_layout(
                 title=asset_name,
                 height=490,
