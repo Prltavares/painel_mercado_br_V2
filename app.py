@@ -77,13 +77,15 @@ BRAZILIAN_STOCKS: dict[str, str] = {
 # Isso oferece uma forma uniforme de ler os feeds, mas os links continuam
 # levando para a publicação original e a disponibilidade varia por veículo.
 NEWS_FEEDS = [
-    {"name": "Valor Econômico", "query": "site:valor.globo.com mercados economia", "category": "Brasil", "lang": "pt-BR", "country": "BR", "ceid": "BR:pt-419"},
-    {"name": "InfoMoney", "query": "site:infomoney.com.br mercados bolsa economia", "category": "Brasil", "lang": "pt-BR", "country": "BR", "ceid": "BR:pt-419"},
-    {"name": "Agência Brasil", "query": "site:agenciabrasil.ebc.com.br economia mercado", "category": "Brasil", "lang": "pt-BR", "country": "BR", "ceid": "BR:pt-419"},
-    {"name": "Money Times", "query": "site:moneytimes.com.br mercado bolsa economia", "category": "Brasil", "lang": "pt-BR", "country": "BR", "ceid": "BR:pt-419"},
-    {"name": "Reuters", "query": "site:reuters.com/markets OR site:reuters.com/business economy markets", "category": "Internacional", "lang": "en-US", "country": "US", "ceid": "US:en"},
-    {"name": "Bloomberg", "query": "site:bloomberg.com/news markets economy", "category": "Internacional", "lang": "en-US", "country": "US", "ceid": "US:en"},
-    {"name": "CNBC", "query": "site:cnbc.com markets economy stocks", "category": "Internacional", "lang": "en-US", "country": "US", "ceid": "US:en"},
+    # Prioriza RSS publicados pelos próprios veículos: os links apontam para
+    # as matérias originais e normalmente permitem extrair a imagem editorial.
+    {"name": "InfoMoney", "url": "https://www.infomoney.com.br/feed/", "category": "Brasil"},
+    {"name": "Valor Econômico", "url": "https://valor.globo.com/rss/valor", "category": "Brasil"},
+    {"name": "Agência Brasil — Economia", "url": "https://agenciabrasil.ebc.com.br/rss/economia/feed.xml", "category": "Brasil"},
+    {"name": "Money Times", "url": "https://www.moneytimes.com.br/feed/", "category": "Brasil"},
+    {"name": "Bloomberg Markets", "url": "https://feeds.bloomberg.com/markets/news.rss", "category": "Internacional"},
+    {"name": "CNBC Markets", "url": "https://www.cnbc.com/id/100727362/device/rss/rss.html", "category": "Internacional"},
+    {"name": "The Guardian — Economia", "url": "https://www.theguardian.com/business/economics/rss", "category": "Internacional"},
 ]
 
 
@@ -222,6 +224,64 @@ def apply_theme(theme: str, high_contrast: bool, large_text: bool) -> None:
     section[data-testid="stSidebar"] [data-testid="stButton"] button:focus-visible {{
       outline:3px solid var(--accent) !important; outline-offset:2px !important;
     }}
+
+    /* Contraste reforçado para widgets e navegação em todos os temas.
+       Algumas versões do Streamlit aplicam cores próprias ao texto interno
+       dos botões, portanto o estilo é aplicado também aos elementos filhos. */
+    section[data-testid="stSidebar"] [data-testid="stButton"] button,
+    section[data-testid="stSidebar"] [data-testid="stButton"] button * {{
+      color: var(--text) !important;
+      -webkit-text-fill-color: currentColor !important;
+      opacity: 1 !important;
+    }}
+    section[data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"],
+    section[data-testid="stSidebar"] [data-testid="stButton"] button[kind="primary"] * {{
+      color: var(--accent) !important;
+      -webkit-text-fill-color: var(--accent) !important;
+      font-weight: 750 !important;
+    }}
+    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"],
+    section[data-testid="stSidebar"] [data-testid="stWidgetLabel"] *,
+    section[data-testid="stSidebar"] label,
+    section[data-testid="stSidebar"] label *,
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
+    section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] * {{
+      color: var(--text) !important;
+      -webkit-text-fill-color: currentColor !important;
+    }}
+    section[data-testid="stSidebar"] .section-label,
+    section[data-testid="stSidebar"] .brand-tagline,
+    section[data-testid="stSidebar"] .muted-note {{ color: var(--muted) !important; }}
+
+    /* Abas, seletores, caixas de seleção e opções dos menus */
+    [data-testid="stTabs"] button,
+    [data-testid="stTabs"] button *,
+    [data-testid="stRadio"] label,
+    [data-testid="stRadio"] label *,
+    [data-testid="stCheckbox"] label,
+    [data-testid="stCheckbox"] label *,
+    [data-testid="stWidgetLabel"],
+    [data-testid="stWidgetLabel"] * {{
+      color: var(--text) !important;
+      -webkit-text-fill-color: currentColor !important;
+      opacity: 1 !important;
+    }}
+    [data-testid="stTabs"] button[aria-selected="true"],
+    [data-testid="stTabs"] button[aria-selected="true"] * {{
+      color: var(--accent) !important;
+      -webkit-text-fill-color: var(--accent) !important;
+    }}
+    [data-baseweb="select"] *, [data-baseweb="popover"] *,
+    [role="listbox"] *, [role="option"] {{
+      color: var(--text) !important;
+      -webkit-text-fill-color: currentColor !important;
+    }}
+    [data-baseweb="popover"], [role="listbox"] {{
+      background: var(--surface) !important;
+      border-color: var(--border) !important;
+    }}
+    [data-baseweb="menu"] [role="option"]:hover,
+    [role="option"][aria-selected="true"] {{ background: var(--surface-alt) !important; }}
 
     @media (max-width: 800px) {{
       .block-container {{ padding-left:1rem; padding-right:1rem; }}
@@ -375,7 +435,37 @@ def clean_html(value: str | None) -> str:
     return BeautifulSoup(value, "html.parser").get_text(" ", strip=True)
 
 
-def valid_image_url(value: str | None, base_url: str | None = None) -> str | None:
+def local_tag(tag: str) -> str:
+    """Nome local de uma tag XML, ignorando namespaces RSS/Atom."""
+    return tag.rsplit("}", 1)[-1].split(":")[-1].lower()
+
+
+def is_generic_image(value: str, alt: str = "") -> bool:
+    """Descarta logos e ícones de marca para não usá-los como foto da notícia."""
+    parsed = urlparse(value)
+    host = (parsed.netloc or "").lower()
+    path = (parsed.path or "").lower()
+    words = f"{host} {path} {alt.lower()}"
+
+    if not host or host.endswith("news.google.com"):
+        return True
+    if any(token in words for token in (
+        "favicon", "/logo", "-logo", "_logo", "brandmark", "brand-mark",
+        "google-news", "google_news", "publisher-logo", "site-logo",
+        "avatar", "placeholder", "default-image", "default_thumbnail",
+        "social-icon", "app-icon", "apple-touch-icon", "sprite.svg",
+    )):
+        return True
+    if path.endswith(".svg"):
+        return True
+    return False
+
+
+def valid_image_url(
+    value: str | None,
+    base_url: str | None = None,
+    alt: str = "",
+) -> str | None:
     if not value:
         return None
     value = value.strip()
@@ -383,33 +473,37 @@ def valid_image_url(value: str | None, base_url: str | None = None) -> str | Non
         value = "https:" + value
     elif base_url and not value.startswith(("https://", "http://", "data:")):
         value = urljoin(base_url, value)
-    if value.startswith(("https://", "http://")) and not value.lower().endswith(".svg"):
-        return value
-    return None
+
+    if not value.startswith(("https://", "http://")):
+        return None
+    if is_generic_image(value, alt=alt):
+        return None
+    return value
 
 
-def item_image(item: ET.Element, description: str) -> str | None:
-    # Procura namespaces Media RSS, thumbnails e enclosures no próprio feed.
-    for element in item.iter():
-        tag = element.tag.lower()
-        if tag.endswith("thumbnail") or tag.endswith("content"):
-            candidate = element.attrib.get("url") or element.attrib.get("href")
-            image = valid_image_url(candidate)
-            if image:
-                return image
-        if tag.endswith("enclosure"):
-            candidate = element.attrib.get("url")
-            media_type = element.attrib.get("type", "")
-            image = valid_image_url(candidate)
-            if image and media_type.startswith("image/"):
-                return image
-
-    # Alguns feeds colocam a imagem dentro do HTML da descrição.
+def extract_image_from_markup(markup: str, base_url: str | None = None) -> str | None:
+    """Encontra imagens editoriais embutidas no conteúdo da matéria/feed."""
+    if not markup:
+        return None
     try:
-        soup = BeautifulSoup(description or "", "html.parser")
-        image_tag = soup.find("img")
-        if image_tag:
-            image = valid_image_url(image_tag.get("src"))
+        soup = BeautifulSoup(markup, "html.parser")
+        # Favorece imagens que o próprio HTML identifica como principais.
+        for img in soup.find_all("img"):
+            alt = img.get("alt", "") or img.get("title", "")
+            candidate = (
+                img.get("src") or img.get("data-src") or img.get("data-lazy-src")
+                or img.get("data-original")
+            )
+            width = img.get("width")
+            height = img.get("height")
+            try:
+                if width and int(width) < 180:
+                    continue
+                if height and int(height) < 100:
+                    continue
+            except (TypeError, ValueError):
+                pass
+            image = valid_image_url(candidate, base_url, alt=alt)
             if image:
                 return image
     except Exception:
@@ -417,70 +511,188 @@ def item_image(item: ET.Element, description: str) -> str | None:
     return None
 
 
+def item_image(item: ET.Element, description: str, article_url: str) -> str | None:
+    """Extrai só imagens explicitamente associadas ao item do RSS direto."""
+    for element in item.iter():
+        tag = local_tag(element.tag)
+        candidate = None
+        media_type = (element.attrib.get("type") or "").lower()
+
+        if tag in {"thumbnail", "content", "enclosure", "image"}:
+            candidate = element.attrib.get("url") or element.attrib.get("href")
+            # Não confunde vídeos, áudio e outros conteúdos com imagens.
+            if tag == "enclosure" and media_type and not media_type.startswith("image/"):
+                candidate = None
+            if tag == "content" and media_type and not media_type.startswith("image/"):
+                candidate = None
+
+        if candidate:
+            image = valid_image_url(candidate, article_url)
+            if image:
+                return image
+
+    return extract_image_from_markup(description or "", article_url)
+
+
+def extract_jsonld_images(soup: BeautifulSoup, base_url: str) -> list[str]:
+    """Lê image/thumbnailUrl de objetos Article/NewsArticle, sem pegar logo do publisher."""
+    found: list[str] = []
+
+    def add_value(value: Any) -> None:
+        if isinstance(value, str):
+            image = valid_image_url(value, base_url)
+            if image and image not in found:
+                found.append(image)
+        elif isinstance(value, list):
+            for child in value:
+                add_value(child)
+        elif isinstance(value, dict):
+            for key in ("url", "contentUrl"):
+                if value.get(key):
+                    add_value(value[key])
+
+    def walk(value: Any) -> None:
+        if isinstance(value, list):
+            for child in value:
+                walk(child)
+        elif isinstance(value, dict):
+            raw_type = value.get("@type", [])
+            types = {raw_type} if isinstance(raw_type, str) else set(raw_type or [])
+            if types.intersection({"NewsArticle", "Article", "BlogPosting", "ReportageNewsArticle"}):
+                add_value(value.get("image"))
+                add_value(value.get("thumbnailUrl"))
+            # JSON-LD sites can wrap Article inside @graph.
+            for key, child in value.items():
+                if key in {"@graph", "mainEntity", "mainEntityOfPage"} or isinstance(child, (dict, list)):
+                    walk(child)
+
+    for script in soup.find_all("script", attrs={"type": re.compile("ld\\+json", re.I)}):
+        try:
+            import json
+            walk(json.loads(script.string or script.get_text()))
+        except Exception:
+            continue
+    return found
+
+
 def get_article_image(url: str) -> str | None:
-    """Segue o link e tenta extrair og:image / twitter:image da matéria original."""
+    """Procura a foto principal no HTML do veículo original."""
+    parsed_input = urlparse(url)
+    # Não tenta interpretar a página intermediária do Google como matéria.
+    if (parsed_input.netloc or "").lower().endswith("news.google.com"):
+        return None
+
     try:
         response = requests.get(
             url,
             headers=REQUEST_HEADERS,
-            timeout=4,
+            timeout=6,
             allow_redirects=True,
         )
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
+        final_url = response.url
+        if (urlparse(final_url).netloc or "").lower().endswith("news.google.com"):
+            return None
 
+        soup = BeautifulSoup(response.text, "html.parser")
+        # Open Graph e Twitter Card são as melhores pistas para a imagem editorial.
         for attrs in (
             {"property": "og:image"},
+            {"property": "og:image:secure_url"},
             {"name": "twitter:image"},
             {"property": "twitter:image"},
         ):
             tag = soup.find("meta", attrs=attrs)
             if tag and tag.get("content"):
-                candidate = valid_image_url(tag.get("content"), response.url)
+                candidate = valid_image_url(tag.get("content"), final_url)
                 if candidate:
-                    parsed = urlparse(candidate)
-                    # Não usar imagem genérica do Google News como se fosse da matéria.
-                    if parsed.netloc and "news.google.com" not in parsed.netloc:
-                        return candidate
-    except Exception:
-        return None
+                    return candidate
+
+        # Algumas páginas publicam a imagem via Schema.org NewsArticle.
+        schema_images = extract_jsonld_images(soup, final_url)
+        if schema_images:
+            return schema_images[0]
+
+        # Último recurso: somente imagens com indicação razoável de conteúdo.
+        article = soup.find("article") or soup.find("main") or soup
+        for img in article.find_all("img"):
+            alt = img.get("alt", "") or img.get("title", "")
+            width = img.get("width")
+            height = img.get("height")
+            try:
+                if width and int(width) < 220:
+                    continue
+                if height and int(height) < 120:
+                    continue
+            except (TypeError, ValueError):
+                pass
+            candidate = (
+                img.get("src") or img.get("data-src") or img.get("data-lazy-src")
+                or img.get("data-original")
+            )
+            image = valid_image_url(candidate, final_url, alt=alt)
+            if image:
+                return image
+    except Exception as error:
+        print(f"Imagem indisponível para {url}: {error}")
     return None
+
+
+def child_text(item: ET.Element, names: set[str]) -> str:
+    for child in item.iter():
+        if local_tag(child.tag) in names and child.text and child.text.strip():
+            return child.text.strip()
+    return ""
+
+
+def article_link(item: ET.Element) -> str:
+    for child in item:
+        if local_tag(child.tag) != "link":
+            continue
+        href = (child.attrib.get("href") or "").strip()
+        rel = (child.attrib.get("rel") or "alternate").lower()
+        text = (child.text or "").strip()
+        if href and rel in {"alternate", ""}:
+            return href
+        if text.startswith(("http://", "https://")):
+            return text
+    return child_text(item, {"link"})
 
 
 def fetch_feed(feed: dict[str, str]) -> list[dict[str, Any]]:
     try:
         response = requests.get(
-            "https://news.google.com/rss/search",
-            params={
-                "q": feed["query"],
-                "hl": feed["lang"],
-                "gl": feed["country"],
-                "ceid": feed["ceid"],
-            },
+            feed["url"],
             headers=REQUEST_HEADERS,
-            timeout=7,
+            timeout=8,
         )
         response.raise_for_status()
         root = ET.fromstring(response.content)
+        # RSS usa <item>; Atom usa <entry>.
+        items = [node for node in root.iter() if local_tag(node.tag) in {"item", "entry"}]
         results: list[dict[str, Any]] = []
-        for item in root.findall(".//item"):
-            title = clean_html(item.findtext("title", ""))
-            link = (item.findtext("link", "") or "").strip()
-            pub_date = (item.findtext("pubDate", "") or "").strip()
-            description = item.findtext("description", "") or ""
-            if not title or not link:
+
+        for item in items:
+            title = clean_html(child_text(item, {"title"}))
+            link = article_link(item)
+            pub_date = child_text(item, {"pubdate", "published", "updated", "date"})
+            description = child_text(item, {"description", "summary", "encoded", "content"})
+            if not title or not link or not link.startswith(("https://", "http://")):
                 continue
-            source_node = item.find("source")
-            source = clean_html(source_node.text) if source_node is not None else feed["name"]
+
+            # Esses feeds precisam apontar para o artigo original; não aceitaremos
+            # imagens/ligações do agregador como prévia editorial.
+            image = item_image(item, description, link)
             results.append({
                 "title": title,
                 "url": link,
-                "source": source or feed["name"],
+                "source": feed["name"],
                 "date": pub_date,
                 "category": feed["category"],
-                "image": item_image(item, description),
+                "image": image,
                 "description": clean_html(description),
             })
+
         return results
     except Exception as error:
         print(f"RSS indisponível ({feed['name']}): {error}")
@@ -508,13 +720,13 @@ def parse_news_date(value: str) -> datetime:
 @st.cache_data(ttl=600, show_spinner=False)
 def get_news() -> list[dict[str, Any]]:
     articles: list[dict[str, Any]] = []
-    # Busca os feeds simultaneamente para não deixar uma fonte lenta travar a página.
-    with ThreadPoolExecutor(max_workers=7) as executor:
+    # Requisições paralelas impedem que um feed lento atrase todas as notícias.
+    with ThreadPoolExecutor(max_workers=min(7, len(NEWS_FEEDS))) as executor:
         batches = list(executor.map(fetch_feed, NEWS_FEEDS))
     for batch in batches:
         articles.extend(batch)
 
-    # Remove duplicadas pelo título, mesmo quando vêm de dois feeds diferentes.
+    # Deduplica matérias que aparecem em mais de um feed.
     seen: set[str] = set()
     unique: list[dict[str, Any]] = []
     for article in articles:
@@ -526,9 +738,9 @@ def get_news() -> list[dict[str, Any]]:
 
     unique.sort(key=lambda x: parse_news_date(x["date"]), reverse=True)
 
-    # Busca metadata de imagem só para as primeiras matérias sem imagem no feed.
-    # Limitar chamadas torna a página bem mais rápida e reduz risco de bloqueio.
-    missing = [article for article in unique[:18] if not article.get("image")]
+    # Obtém imagem do HTML do veículo para matérias cujo RSS não trouxe imagem.
+    # O fallback só é executado em URLs de publicações, nunca nas páginas do Google.
+    missing = [a for a in unique[:18] if not a.get("image")]
     with ThreadPoolExecutor(max_workers=5) as executor:
         images = list(executor.map(lambda article: get_article_image(article["url"]), missing[:10]))
     image_map = {article["url"]: image for article, image in zip(missing[:10], images)}
@@ -537,7 +749,6 @@ def get_news() -> list[dict[str, Any]]:
             article["image"] = image_map[article["url"]]
 
     return unique
-
 
 def possible_market_drivers(title: str) -> list[str]:
     """Mapeamento indicativo de assuntos presentes no título, sem afirmar causa."""
